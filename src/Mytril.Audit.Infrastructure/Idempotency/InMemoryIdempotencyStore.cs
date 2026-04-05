@@ -36,11 +36,12 @@ public sealed class InMemoryIdempotencyStore : IIdempotencyStore
     private void Cleanup()
     {
         var cutoff = DateTime.UtcNow - Ttl;
+        var expired = _store
+            .Where(kvp => kvp.Value < cutoff)
+            .Select(kvp => kvp.Key)
+            .ToList();
 
-        foreach (var kvp in _store)
-        {
-            if (kvp.Value < cutoff)
-                _store.TryRemove(kvp.Key, out _);
-        }
+        foreach (var key in expired)
+            _store.TryRemove(key, out _);
     }
 }

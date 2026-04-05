@@ -220,10 +220,7 @@ public sealed class RabbitMqConsumerService : IHostedService, IAsyncDisposable
         PropertyNameCaseInsensitive = true
     };
 
-    /// <summary>
-    /// Internal DTO for deserializing the RabbitMQ message body.
-    /// Mirrors the AuditableEvent structure from the SDK.
-    /// </summary>
+    // Separate from SDK's AuditableEvent to avoid version coupling
     private sealed record AuditEventEnvelope
     {
         public Guid EventId { get; init; }
