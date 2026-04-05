@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Mytril.Audit.Api/Mytril.Audit.Api.csproj" />
+    <Project Path="src/Mytril.Audit.Application/Mytril.Audit.Application.csproj" />
+    <Project Path="src/Mytril.Audit.Domain/Mytril.Audit.Domain.csproj" />
+    <Project Path="src/Mytril.Audit.Infrastructure/Mytril.Audit.Infrastructure.csproj" />
+    <Project Path="src/Mytril.Audit.Sdk/Mytril.Audit.Sdk.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Mytril.Audit.Application.Tests/Mytril.Audit.Application.Tests.csproj" />
+    <Project Path="tests/Mytril.Audit.Domain.Tests/Mytril.Audit.Domain.Tests.csproj" />
+    <Project Path="tests/Mytril.Audit.Integration.Tests/Mytril.Audit.Integration.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,119 @@
+#######################################
+# Build
+#######################################
+[Bb]in/
+[Oo]bj/
+out/
+publish/
+**/publish/
+artifacts/
+[Dd]ebug/
+[Rr]elease/
+bld/
+
+#######################################
+# Visual Studio / IDE
+#######################################
+.vs/
+*.user
+*.rsuser
+*.suo
+*.userosscache
+*.sln.docstates
+
+#######################################
+# Rider / IntelliJ
+#######################################
+.idea/
+*.sln.iml
+
+#######################################
+# VS Code
+#######################################
+.vscode/
+
+#######################################
+# Testes / cobertura
+#######################################
+TestResults/
+coverage/
+*.trx
+*.coverage
+*.coveragexml
+
+#######################################
+# Logs / temporarios
+#######################################
+*.log
+logs/
+Logs/
+tmp/
+temp/
+
+#######################################
+# Pacotes / cache
+#######################################
+packages/
+.nuget/
+*.nupkg
+*.snupkg
+project.lock.json
+project.fragment.lock.json
+
+#######################################
+# Publicacao
+#######################################
+app.publish/
+*.publishsettings
+
+#######################################
+# Banco de dados local
+#######################################
+*.mdf
+*.ldf
+*.db
+*.sqlite
+*.sqlite3
+
+#######################################
+# Segredos / certificados
+#######################################
+*.pfx
+*.p12
+*.pem
+*.key
+*.crt
+*.pdb
+secrets.json
+**/*secrets*.json
+.env
+.env.*
+
+#######################################
+# App settings locais e por ambiente
+#######################################
+appsettings.Development.json
+appsettings.Local.json
+appsettings.*.local.json
+appsettings.desenv.json
+appsettings.homol.json
+appsettings.prod.json
+
+#######################################
+# Docker
+#######################################
+docker-compose.override.yml
+
+#######################################
+# ASP.NET
+#######################################
+**/Properties/launchSettings.json
+
+#######################################
+# Sistema Operacional
+#######################################
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+desktop.ini
