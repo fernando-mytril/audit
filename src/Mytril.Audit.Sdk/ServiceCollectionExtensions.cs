@@ -11,20 +11,15 @@ public static class ServiceCollectionExtensions
     /// </summary>
     public static IServiceCollection AddMytrilAuditProducer(
         this IServiceCollection services,
-        IConfiguration configuration,
-        Action<AuditProducerOptions>? configure = null)
+        IConfiguration configuration)
     {
-        var optionsBuilder = services
+        services
             .AddOptions<AuditProducerOptions>()
             .Bind(configuration.GetSection(AuditProducerOptions.SectionName))
             .Validate(
                 o => !string.IsNullOrWhiteSpace(o.Source),
-                "AuditProducer:Source is required — must be kebab-case service identifier.");
-
-        if (configure is not null)
-            optionsBuilder.Configure(configure);
-
-        optionsBuilder.ValidateOnStart();
+                "AuditProducer:Source is required — must be kebab-case service identifier.")
+            .ValidateOnStart();
 
         services.AddScoped<IAuditProducer, AuditProducer>();
 

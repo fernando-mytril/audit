@@ -12,6 +12,9 @@ public sealed class AuditProducer(
     ILogger<AuditProducer> logger
 ) : IAuditProducer
 {
+    private static readonly JsonSerializerOptions CamelCaseOptions =
+        new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+
     private readonly AuditProducerOptions _opts = opts.Value;
 
     public Task PublishAsync<TPayload>(
@@ -20,8 +23,7 @@ public sealed class AuditProducer(
         Guid? tenantProductId = null, string? ipAddress = null,
         string? correlationId = null, string? traceId = null, CancellationToken ct = default)
     {
-        var json = JsonSerializer.Serialize(payload,
-            new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+        var json = JsonSerializer.Serialize(payload, CamelCaseOptions);
 
         return PublishAsync(eventType, json, severity, userId, actorId, tenantId,
             tenantProductId, ipAddress, correlationId, traceId, ct);
