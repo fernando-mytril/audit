@@ -1,69 +1,66 @@
 using System.Diagnostics;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Mytril.Audit.Sdk.Internal;
 
 namespace Mytril.Audit.Sdk;
 
-public sealed class AuditProducer : IAuditProducer
+public sealed class AuditProducer(
+    IOutboxRepository outboxRepository,
+    IOptions<AuditProducerOptions> opts,
+    ILogger<AuditProducer> logger
+) : IAuditProducer
 {
-    private readonly AuditProducerOptions _options;
-    private readonly IEventOutbox _outbox;
+    private readonly AuditProducerOptions _opts = opts.Value;
 
-    public AuditProducer(IOptions<AuditProducerOptions> options, IEventOutbox outbox)
+    public Task PublishAsync<TPayload>(
+        string eventType, TPayload payload, AuditSeverity severity = AuditSeverity.Info,
+        Guid? userId = null, Guid? actorId = null, Guid? tenantId = null,
+        Guid? tenantProductId = null, string? ipAddress = null,
+        string? correlationId = null, string? traceId = null, CancellationToken ct = default)
     {
-        _options = options.Value;
-        _outbox = outbox;
+        var json = JsonSerializer.Serialize(payload,
+            new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+
+        return PublishAsync(eventType, json, severity, userId, actorId, tenantId,
+            tenantProductId, ipAddress, correlationId, traceId, ct);
     }
 
     public async Task PublishAsync(
-        string eventType, string payload,
-        AuditSeverity severity = AuditSeverity.Info,
-        Guid? userId = null, Guid? actorId = null,
-        Guid? tenantId = null, Guid? tenantProductId = null,
-        string? ipAddress = null, string? correlationId = null,
-        string? traceId = null, CancellationToken ct = default)
+        string eventType, string payload, AuditSeverity severity = AuditSeverity.Info,
+        Guid? userId = null, Guid? actorId = null, Guid? tenantId = null,
+        Guid? tenantProductId = null, string? ipAddress = null,
+        string? correlationId = null, string? traceId = null, CancellationToken ct = default)
     {
-        var resolvedTraceId = traceId ?? Activity.Current?.TraceId.ToString() ?? Guid.NewGuid().ToString();
+        var (sanitizedPayload, removedFields) = PayloadValidator.SanitizeAndReport(payload);
 
-        var auditEvent = new AuditableEvent
+        if (removedFields.Count > 0)
         {
-            EventId = Guid.NewGuid(),
-            EventType = eventType,
-            Source = _options.Source,
-            Severity = severity,
-            UserId = userId,
-            ActorId = actorId,
-            TenantId = tenantId,
+            logger.LogWarning(
+                "Forbidden fields removed from audit payload | source={Source} eventType={EventType} fields={Fields}",
+                _opts.Source, eventType, string.Join(", ", removedFields));
+        }
+
+        var envelope = new AuditableEvent
+        {
+            EventType       = eventType.ToUpperInvariant(),
+            Source          = _opts.Source,
+            Severity        = severity,
+            TraceId         = traceId ?? Activity.Current?.TraceId.ToString() ?? Guid.NewGuid().ToString("N"),
+            CorrelationId   = correlationId,
+            Payload         = sanitizedPayload,
+            UserId          = userId,
+            ActorId         = actorId,
+            TenantId        = tenantId,
             TenantProductId = tenantProductId,
-            IpAddress = ipAddress,
-            CorrelationId = correlationId,
-            TraceId = resolvedTraceId,
-            Payload = payload,
-            OccurredAt = DateTime.UtcNow
+            IpAddress       = ipAddress,
         };
 
-        var body = JsonSerializer.Serialize(auditEvent);
-        var routingKey = $"{_options.RoutingKeyPrefix}.{_options.Source}.{eventType}";
+        await outboxRepository.AddAuditEventAsync(envelope, ct);
 
-        await _outbox.PublishAsync("audit", routingKey, body, ct);
-    }
-
-    public Task PublishAsync<TPayload>(
-        string eventType, TPayload payload,
-        AuditSeverity severity = AuditSeverity.Info,
-        Guid? userId = null, Guid? actorId = null,
-        Guid? tenantId = null, Guid? tenantProductId = null,
-        string? ipAddress = null, string? correlationId = null,
-        string? traceId = null, CancellationToken ct = default)
-    {
-        var serializedPayload = JsonSerializer.Serialize(payload);
-
-        return PublishAsync(
-            eventType, serializedPayload,
-            severity,
-            userId, actorId,
-            tenantId, tenantProductId,
-            ipAddress, correlationId,
-            traceId, ct);
+        logger.LogDebug(
+            "Audit event queued | eventType={EventType} eventId={EventId} source={Source} traceId={TraceId}",
+            envelope.EventType, envelope.EventId, _opts.Source, envelope.TraceId);
     }
 }

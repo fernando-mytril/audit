@@ -2,6 +2,11 @@ namespace Mytril.Audit.Sdk;
 
 public sealed class AuditProducerOptions
 {
-    public string Source { get; set; } = default!;
-    public string RoutingKeyPrefix { get; set; } = "audit";
+    public const string SectionName = "AuditProducer";
+
+    /// <summary>
+    /// Identificador kebab-case do serviço. Deve ser único na plataforma.
+    /// Exemplos: mytril-identity, mytril-billing, mytril-scheduler.
+    /// </summary>
+    public required string Source { get; init; }
 }
