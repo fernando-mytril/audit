@@ -65,6 +65,12 @@ public static class InfrastructureExtensions
                 Uri = new Uri(rabbitConnection)
             });
 
+            services.AddSingleton<IConnection>(sp =>
+            {
+                var factory = sp.GetRequiredService<IConnectionFactory>();
+                return factory.CreateConnectionAsync().GetAwaiter().GetResult();
+            });
+
             services.AddHostedService<RabbitMqConsumerService>();
         }
 
