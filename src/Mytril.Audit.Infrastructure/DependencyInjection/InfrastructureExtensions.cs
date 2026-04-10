@@ -49,9 +49,6 @@ public static class InfrastructureExtensions
                 ConnectionMultiplexer.Connect(redisConnection));
 
             services.AddSingleton<IIdempotencyStore, RedisIdempotencyStore>();
-
-            services.AddHealthChecks()
-                .AddRedis(redisConnection, name: "redis");
         }
         else
         {
@@ -68,15 +65,24 @@ public static class InfrastructureExtensions
                 Uri = new Uri(rabbitConnection)
             });
 
-            services.AddHostedService<RabbitMqConsumerService>();
+            services.AddSingleton<IConnection>(sp =>
+            {
+                var factory = sp.GetRequiredService<IConnectionFactory>();
+                return factory.CreateConnectionAsync().GetAwaiter().GetResult();
+            });
 
-            services.AddHealthChecks()
-                .AddRabbitMQ(name: "rabbitmq");
+            services.AddHostedService<RabbitMqConsumerService>();
         }
 
-        // --- Health Checks: PostgreSQL ---
-        services.AddHealthChecks()
+        // --- Health Checks ---
+        var hc = services.AddHealthChecks()
             .AddDbContextCheck<AuditDbContext>("postgres");
+
+        if (!string.IsNullOrWhiteSpace(redisConnection))
+            hc.AddRedis(redisConnection, name: "redis");
+
+        if (!string.IsNullOrWhiteSpace(rabbitConnection))
+            hc.AddRabbitMQ(name: "rabbitmq");
 
         // --- Application: Use Cases ---
         services.AddScoped<IngestAuditEventUseCase>();
