@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Mytril.Audit.Api.Constants;
 using Serilog.Context;
 
@@ -11,6 +12,9 @@ public sealed class CorrelationIdMiddleware(RequestDelegate next)
                             ?? Guid.NewGuid().ToString();
 
         context.Response.Headers[ApiConstants.CorrelationIdHeader] = correlationId;
+
+        Activity.Current?.SetBaggage("correlation.id", correlationId);
+        Activity.Current?.SetTag("correlation.id", correlationId);
 
         using (LogContext.PushProperty("CorrelationId", correlationId))
         {

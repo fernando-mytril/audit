@@ -6,18 +6,45 @@ using Microsoft.OpenApi;
 using Mytril.Audit.Api.Constants;
 using Mytril.Audit.Api.Middlewares;
 using Mytril.Audit.Infrastructure.DependencyInjection;
+using Mytril.Audit.Infrastructure.Observability;
 using Scalar.AspNetCore;
 using Serilog;
+using Serilog.Sinks.OpenTelemetry;
 
-Log.Logger = new LoggerConfiguration()
+var obsOptions = new ConfigurationBuilder()
+    .AddJsonFile("appsettings.json", optional: true)
+    .AddJsonFile($"appsettings.{Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production"}.json", optional: true)
+    .AddEnvironmentVariables()
+    .Build()
+    .GetSection(ObservabilityOptions.SectionName)
+    .Get<ObservabilityOptions>() ?? new ObservabilityOptions();
+
+var logConfig = new LoggerConfiguration()
     .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}")
-    .Enrich.FromLogContext()
-    .CreateLogger();
+    .Enrich.FromLogContext();
+
+if (obsOptions.EnableLogging)
+{
+    logConfig.WriteTo.OpenTelemetry(opts =>
+    {
+        opts.Endpoint = obsOptions.OtlpEndpoint;
+        opts.Protocol = OtlpProtocol.Grpc;
+        opts.ResourceAttributes = new Dictionary<string, object>
+        {
+            ["service.name"] = obsOptions.ServiceName,
+            ["service.version"] = obsOptions.ServiceVersion,
+            ["deployment.environment"] = obsOptions.Environment
+        };
+    });
+}
+
+Log.Logger = logConfig.CreateLogger();
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseSerilog();
 
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddObservability(builder.Configuration);
 builder.Services.AddControllers();
 
 // Authentication
@@ -77,6 +104,9 @@ app.MapControllers();
 app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false });
 app.MapHealthChecks("/health/ready");
 app.MapHealthChecks("/health");
+
+if (obsOptions.EnablePrometheusEndpoint && obsOptions.EnableMetrics)
+    app.MapPrometheusScrapingEndpoint("/metrics");
 
 app.Run();
 

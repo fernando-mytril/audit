@@ -1,8 +1,10 @@
+using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Mytril.Audit.Application.Diagnostics;
 using Mytril.Audit.Application.UseCases.IngestAuditEvent;
 using Mytril.Audit.Domain.Enums;
 using Mytril.Audit.Domain.Exceptions;
@@ -17,6 +19,9 @@ public sealed class RabbitMqConsumerService : IHostedService, IAsyncDisposable
     private const string ExchangeName = "platform.audit.events";
     private const string QueueName = "platform.audit.ingest";
     private const string BindingKey = "audit.#";
+
+    private const string SchedulerExchangeName = "platform.scheduler.commands";
+    private const string SchedulerBindingKey = "scheduler.self.*";
 
     private const string DlxExchangeName = "platform.audit.dlx";
     private const string DlqQueueName = "platform.audit.dead-letter";
@@ -89,6 +94,19 @@ public sealed class RabbitMqConsumerService : IHostedService, IAsyncDisposable
             routingKey: BindingKey,
             cancellationToken: cancellationToken);
 
+        // Bind to Scheduler's exchange for self-audit events (job succeeded/failed/dead)
+        await _channel.ExchangeDeclareAsync(
+            exchange: SchedulerExchangeName,
+            type: ExchangeType.Topic,
+            durable: true,
+            cancellationToken: cancellationToken);
+
+        await _channel.QueueBindAsync(
+            queue: QueueName,
+            exchange: SchedulerExchangeName,
+            routingKey: SchedulerBindingKey,
+            cancellationToken: cancellationToken);
+
         // Set prefetch to process one message at a time
         await _channel.BasicQosAsync(prefetchSize: 0, prefetchCount: 1, global: false, cancellationToken: cancellationToken);
 
@@ -109,6 +127,12 @@ public sealed class RabbitMqConsumerService : IHostedService, IAsyncDisposable
     private async Task OnMessageReceivedAsync(object sender, BasicDeliverEventArgs ea)
     {
         var deliveryTag = ea.DeliveryTag;
+        using var activity = AuditDiagnostics.ActivitySource.StartActivity("ProcessRabbitMqMessage",
+            ActivityKind.Consumer);
+        activity?.SetTag("messaging.system", "rabbitmq");
+        activity?.SetTag("messaging.destination", QueueName);
+
+        AuditDiagnostics.ConsumerReceived.Add(1);
 
         try
         {
@@ -117,6 +141,9 @@ public sealed class RabbitMqConsumerService : IHostedService, IAsyncDisposable
 
             if (envelope is null)
                 throw new InvalidAuditEnvelopeException("Failed to deserialize audit event envelope.");
+
+            activity?.SetTag("audit.source", envelope.Source);
+            activity?.SetTag("audit.event_type", envelope.EventType);
 
             var command = new IngestAuditEventCommand(
                 EventId: envelope.EventId,
@@ -141,8 +168,11 @@ public sealed class RabbitMqConsumerService : IHostedService, IAsyncDisposable
 
             if (await idempotencyStore.ExistsAsync(command.EventId))
             {
+                AuditDiagnostics.EventDuplicate.Add(1,
+                    new KeyValuePair<string, object?>("source", envelope.Source));
                 _logger.LogDebug("Duplicate event skipped via idempotency store — EventId: {EventId}", command.EventId);
                 await AckAsync(deliveryTag);
+                activity?.SetStatus(ActivityStatusCode.Ok);
                 return;
             }
 
@@ -152,20 +182,29 @@ public sealed class RabbitMqConsumerService : IHostedService, IAsyncDisposable
             await idempotencyStore.MarkProcessedAsync(command.EventId);
             await AckAsync(deliveryTag);
 
+            AuditDiagnostics.ConsumerProcessed.Add(1);
+            activity?.SetStatus(ActivityStatusCode.Ok);
             _logger.LogDebug("Audit event processed — EventId: {EventId}", command.EventId);
         }
         catch (InvalidAuditEnvelopeException ex)
         {
+            AuditDiagnostics.EventInvalid.Add(1);
+            AuditDiagnostics.ConsumerFailed.Add(1);
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             _logger.LogError(ex, "Invalid audit envelope — sending to DLQ. DeliveryTag: {DeliveryTag}", deliveryTag);
             await NackAsync(deliveryTag, requeue: false);
         }
         catch (DuplicateAuditEventException ex)
         {
+            AuditDiagnostics.EventDuplicate.Add(1);
+            activity?.SetStatus(ActivityStatusCode.Ok);
             _logger.LogDebug(ex, "Duplicate audit event — acknowledging. DeliveryTag: {DeliveryTag}", deliveryTag);
             await AckAsync(deliveryTag);
         }
         catch (Exception ex)
         {
+            AuditDiagnostics.ConsumerRequeued.Add(1);
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             _logger.LogError(ex, "Transient error processing audit event — requeuing. DeliveryTag: {DeliveryTag}", deliveryTag);
             await NackAsync(deliveryTag, requeue: true);
         }

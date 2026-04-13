@@ -1,5 +1,7 @@
+using System.Diagnostics;
 using System.Text.Json;
 using Mytril.Audit.Api.Responses;
+using Mytril.Audit.Application.Diagnostics;
 using Mytril.Audit.Domain.Exceptions;
 
 namespace Mytril.Audit.Api.Middlewares;
@@ -27,6 +29,8 @@ public sealed class ExceptionHandlerMiddleware(
         catch (Exception ex)
         {
             logger.LogError(ex, "Unhandled exception");
+            Activity.Current?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            Activity.Current?.RecordException(ex);
             await WriteErrorAsync(context, StatusCodes.Status500InternalServerError,
                 new ErrorResponse("INTERNAL_ERROR", "An unexpected error occurred."));
         }

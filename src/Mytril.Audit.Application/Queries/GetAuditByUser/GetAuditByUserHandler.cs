@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using Mytril.Audit.Application.Diagnostics;
 using Mytril.Audit.Application.DTOs;
 using Mytril.Audit.Domain.Repositories;
 
@@ -9,16 +11,31 @@ public sealed class GetAuditByUserHandler(IAuditQueryRepository queryRepository)
         GetAuditByUserQuery query,
         CancellationToken ct = default)
     {
-        var (items, totalCount) = await queryRepository.FindByUserAsync(
-            query.UserId,
-            query.From,
-            query.To,
-            query.Page,
-            query.PageSize,
-            ct);
+        using var activity = AuditDiagnostics.ActivitySource.StartActivity("QueryByUser");
 
-        var dtos = items.Select(AuditEntryDto.From).ToList();
+        var sw = Stopwatch.StartNew();
+        try
+        {
+            var (items, totalCount) = await queryRepository.FindByUserAsync(
+                query.UserId, query.From, query.To, query.Page, query.PageSize, ct);
+            var dtos = items.Select(AuditEntryDto.From).ToList();
 
-        return new PagedResult<AuditEntryDto>(dtos, totalCount, query.Page, query.PageSize);
+            AuditDiagnostics.QueryExecuted.Add(1,
+                new KeyValuePair<string, object?>("query", "ByUser"));
+            activity?.SetStatus(ActivityStatusCode.Ok);
+            return new PagedResult<AuditEntryDto>(dtos, totalCount, query.Page, query.PageSize);
+        }
+        catch (Exception ex)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            activity?.RecordException(ex);
+            throw;
+        }
+        finally
+        {
+            sw.Stop();
+            AuditDiagnostics.UseCaseDuration.Record(sw.Elapsed.TotalMilliseconds,
+                new KeyValuePair<string, object?>("usecase", "QueryByUser"));
+        }
     }
 }

@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using Mytril.Audit.Application.Diagnostics;
 using Mytril.Audit.Application.DTOs;
 using Mytril.Audit.Domain.Repositories;
 
@@ -9,10 +11,31 @@ public sealed class GetAuditByTraceIdHandler(IAuditQueryRepository queryReposito
         GetAuditByTraceIdQuery query,
         CancellationToken ct = default)
     {
-        var (items, totalCount) = await queryRepository.FindByTraceIdAsync(query.TraceId, ct);
+        using var activity = AuditDiagnostics.ActivitySource.StartActivity("QueryByTraceId");
+        activity?.SetTag("audit.query.trace_id", query.TraceId);
 
-        var dtos = items.Select(AuditEntryDto.From).ToList();
+        var sw = Stopwatch.StartNew();
+        try
+        {
+            var (items, totalCount) = await queryRepository.FindByTraceIdAsync(query.TraceId, ct);
+            var dtos = items.Select(AuditEntryDto.From).ToList();
 
-        return new PagedResult<AuditEntryDto>(dtos, totalCount, Page: 1, PageSize: 1000);
+            AuditDiagnostics.QueryExecuted.Add(1,
+                new KeyValuePair<string, object?>("query", "ByTraceId"));
+            activity?.SetStatus(ActivityStatusCode.Ok);
+            return new PagedResult<AuditEntryDto>(dtos, totalCount, Page: 1, PageSize: 1000);
+        }
+        catch (Exception ex)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            activity?.RecordException(ex);
+            throw;
+        }
+        finally
+        {
+            sw.Stop();
+            AuditDiagnostics.UseCaseDuration.Record(sw.Elapsed.TotalMilliseconds,
+                new KeyValuePair<string, object?>("usecase", "QueryByTraceId"));
+        }
     }
 }
