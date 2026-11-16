@@ -1,6 +1,7 @@
 name: Material ID — CI
 
 on:
+  workflow_dispatch:
   push:
     paths: ["material-id/**", ".github/workflows/material-id-ci.yml"]
   pull_request:

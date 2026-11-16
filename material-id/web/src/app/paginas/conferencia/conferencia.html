@@ -89,11 +89,12 @@
             <p class="produto">{{ m.descricao }}</p>
             <p class="row"><strong>{{ kg(m.pesoKg) }}</strong><span class="muted">{{ m.quantidade }} peças</span>
               <span class="muted">Confiança {{ confianca(a.confianca) }}</span></p>
+            @if (simulada(a)) { <p class="muted">Resultado gerado pela IA simulada do ambiente de teste.</p> }
             @if (a.correcao && a.resultado) {
               <p class="muted">Corrigido de: {{ a.resultado.descricao }} · {{ a.resultado.quantidade }} peças</p>
             }
           } @else if (a.status === 'Capturando') {
-            <p class="muted">Aguardando as fotos. A captura guiada pela câmera chega com o E3-02.</p>
+            <p class="muted">Aguardando as fotos. A captura guiada pela câmera chega com o E3-02; por enquanto, toque em "Enviar fotos" para simular o envio.</p>
           } @else if (a.status === 'Processando') {
             <p class="muted" aria-live="polite">Identificando produto e contando as peças…</p>
           } @else if (a.motivoFalha) {

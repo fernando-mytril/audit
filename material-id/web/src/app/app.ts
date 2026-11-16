@@ -1,12 +1,16 @@
 import { Component, inject } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { Sessao } from './core/sessao';
+import { Ambiente } from './core/ambiente';
 
 @Component({
   selector: 'app-root',
   imports: [RouterOutlet, RouterLink, RouterLinkActive],
   template: `
     <a class="pular" href="#conteudo">Pular para o conteúdo</a>
+    @if (ambiente.info()?.iaSimulada) {
+      <p class="faixa-teste" role="note">Ambiente de teste · identificação por IA simulada · dados fictícios</p>
+    }
     @if (sessao.autenticado()) {
       <header class="barra">
         <strong class="marca">Material ID</strong>
@@ -29,10 +33,12 @@ import { Sessao } from './core/sessao';
     .usuario { font-size: .9rem; }
     .pular { position: absolute; left: -999px; }
     .pular:focus { left: 8px; top: 8px; z-index: 10; background: var(--surface); padding: 8px; }
-    .spacer { flex: 1; }`,
+    .spacer { flex: 1; }
+    .faixa-teste { margin: 0; padding: 6px 16px; background: var(--warn); color: var(--bg); font-size: .85rem; font-weight: 700; text-align: center; }`,
 })
 export class App {
   protected readonly sessao = inject(Sessao);
+  protected readonly ambiente = inject(Ambiente);
   private readonly router = inject(Router);
   sair() { this.sessao.sair(); this.router.navigateByUrl('/entrar'); }
 }

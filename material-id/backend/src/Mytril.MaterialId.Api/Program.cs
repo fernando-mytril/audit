@@ -32,6 +32,7 @@ builder.Services.AddSingleton<IRelogio, RelogioDoSistema>();
 // ---------- Segurança: JWT do Mytril Identity, igual ao Mytril.Audit (D27) ----------
 builder.Services.Configure<IdentityOptions>(config.GetSection("Identity"));
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ContextoExecucao>();
 builder.Services.AddScoped<IContextoUsuario, ContextoUsuarioHttp>();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(o =>
@@ -55,6 +56,10 @@ builder.Services.AddAuthorizationBuilder()
     .AddPolicy(Politicas.Catalogo, p => p.RequireClaim(Permissoes.Claim, Permissoes.GerenciarCatalogo))
     .AddPolicy(Politicas.Ia, p => p.RequireClaim(Permissoes.Claim, Permissoes.ResultadoIa));
 
+// ---------- Ambiente de teste ----------
+builder.Services.Configure<IaSimuladaOptions>(config.GetSection("IaSimulada"));
+if (config.GetValue<bool>("IaSimulada:Habilitada")) builder.Services.AddHostedService<IaSimulada>();
+
 // ---------- API ----------
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddProblemDetails();
@@ -68,6 +73,16 @@ builder.Services.AddCors(o => o.AddDefaultPolicy(p => p
 var app = builder.Build();
 
 app.UseExceptionHandler();
+
+// Front publicado pela própria API (uma porta só), quando Web:Pasta aponta para o build do Angular.
+var pastaWeb = config["Web:Pasta"] is { Length: > 0 } p ? Path.GetFullPath(p) : null;
+var arquivosWeb = pastaWeb is not null && Directory.Exists(pastaWeb) ? new Microsoft.Extensions.FileProviders.PhysicalFileProvider(pastaWeb) : null;
+if (arquivosWeb is not null)
+{
+    app.UseDefaultFiles(new DefaultFilesOptions { FileProvider = arquivosWeb });
+    app.UseStaticFiles(new StaticFileOptions { FileProvider = arquivosWeb });
+}
+app.UseRouting(); // depois dos arquivos estáticos, para o fallback do SPA não capturar .js/.css
 app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
@@ -80,6 +95,14 @@ app.MapHealthChecks("/health/ready", new() { Predicate = h => h.Tags.Contains("r
 app.MapCatalogo();
 app.MapConferencias();
 app.MapDevToken();
+app.MapGet("/api/ambiente", (IConfiguration c, IWebHostEnvironment env) => new
+{
+    ambiente = env.EnvironmentName,
+    iaSimulada = c.GetValue<bool>("IaSimulada:Habilitada"),
+    loginDeTeste = env.IsDevelopment()
+}).AllowAnonymous().WithTags("Ambiente");
+if (arquivosWeb is not null)
+    app.MapFallbackToFile("{*caminho:regex(^(?!api/|dev/|health/).*$)}", "index.html", new StaticFileOptions { FileProvider = arquivosWeb });
 
 if (config.GetValue<bool>("Banco:AplicarMigracoesNaInicializacao"))
 {

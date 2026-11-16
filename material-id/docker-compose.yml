@@ -21,6 +21,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__MaterialId: Host=postgres;Port=5432;Database=material_id;Username=material_id;Password=material_id_dev
+      IaSimulada__Habilitada: "true"   # SOMENTE ambiente de teste: substitui o servidor de IA (E4-01)
     depends_on:
       postgres: { condition: service_healthy }
 

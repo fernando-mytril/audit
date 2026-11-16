@@ -20,17 +20,29 @@ namespace Mytril.MaterialId.Tests.Api;
 /// <summary>API real em memória: SQLite no lugar do PostgreSQL e tokens no formato do Mytril Identity.</summary>
 public sealed class ApiFactory : WebApplicationFactory<Program>
 {
+    private readonly IDictionary<string, string?>? configuracoes;
+
+    public ApiFactory(IDictionary<string, string?>? configuracoes = null)
+    {
+        this.configuracoes = configuracoes;
+        _conexao = new SqliteConnection(_cadeia);
+        _conexao.Open();
+    }
+
     public const string Chave = "chave-de-teste-com-mais-de-32-caracteres!!";
-    private readonly SqliteConnection _conexao = new("DataSource=:memory:");
+    // Banco em memória compartilhado: uma conexão fica aberta para mantê-lo vivo e cada contexto abre a sua,
+    // porque a API e o processamento em segundo plano acessam o banco ao mesmo tempo.
+    private readonly string _cadeia = $"DataSource=file:materialid-{Guid.NewGuid():N}?mode=memory&cache=shared";
+    private readonly SqliteConnection _conexao;
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        _conexao.Open();
         builder.UseEnvironment("Testing");
         builder.UseSetting("Jwt:Key", Chave);
         builder.UseSetting("Jwt:Issuer", "mytril-identity");
         builder.UseSetting("Banco:AplicarMigracoesNaInicializacao", "false");
         builder.UseSetting("ConnectionStrings:MaterialId", "Host=nao-usado");
+        foreach (var (chave, valor) in configuracoes ?? new Dictionary<string, string?>()) builder.UseSetting(chave, valor);
 
         builder.ConfigureServices(services =>
         {
@@ -38,8 +50,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
             services.RemoveAll<DbContextOptions<ConferenciasDbContext>>();
             services.RemoveAll<IDbContextOptionsConfiguration<CatalogoDbContext>>();
             services.RemoveAll<IDbContextOptionsConfiguration<ConferenciasDbContext>>();
-            services.AddDbContext<CatalogoDbContext>(o => o.UseSqlite(_conexao));
-            services.AddDbContext<ConferenciasDbContext>(o => o.UseSqlite(_conexao));
+            services.AddDbContext<CatalogoDbContext>(o => o.UseSqlite(_cadeia));
+            services.AddDbContext<ConferenciasDbContext>(o => o.UseSqlite(_cadeia));
         });
     }
 

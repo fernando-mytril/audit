@@ -1,4 +1,4 @@
-import { Component, computed, inject, input, signal } from '@angular/core';
+import { Component, DestroyRef, computed, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { Observable } from 'rxjs';
@@ -62,11 +62,20 @@ export class ConferenciaPagina {
     return [...conf, ...amarr].sort((x, y) => y.em.localeCompare(x.em));
   });
 
+  // Enquanto algum amarrado está em processamento, atualiza a cada 2 s (o tempo real via SignalR chega no E1-04).
+  private readonly temporizador = setInterval(() => {
+    if (!this.ocupado() && this.c()?.analises.some(a => a.status === 'Processando')) this.carregar();
+  }, 2000);
+
+  constructor() { inject(DestroyRef).onDestroy(() => clearInterval(this.temporizador)); }
+
   ngOnInit() { this.carregar(); }
 
   carregar() {
     this.api.conferencia(this.id()).subscribe({ next: d => this.c.set(d), error: e => this.erro.set(mensagemDeErro(e)) });
   }
+
+  simulada(a: Analise) { return a.versaoModelo === 'simulador-dev'; }
 
   acoesConferencia(): GatilhoConferencia[] {
     const d = this.c();

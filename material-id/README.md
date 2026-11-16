@@ -35,10 +35,24 @@ cd web && npm install && npx ng serve
 
 Abra http://localhost:4200. Enquanto o acesso ao Mytril Identity não está disponível (DEP-01), a tela **Entrar** usa o emissor de tokens de teste `POST /dev/token`, que **só existe em Development**.
 
+## Ambiente de teste (para validação do produto)
+
+A API pode servir o front e simular a IA, para testar o fluxo inteiro sem o servidor de IA e sem o Mytril Identity:
+
+```bash
+cd web && npx ng build
+cd ../backend/src/Mytril.MaterialId.Api
+ASPNETCORE_ENVIRONMENT=Development IaSimulada__Habilitada=true Web__Pasta=../../../web/dist/web/browser \
+  dotnet run --urls http://0.0.0.0:8080
+```
+
+* **Cadastro e login de teste:** na tela de entrada, "Cadastrar empresa" cria uma empresa de teste (no navegador) e "Entrar" escolhe empresa, nome e perfil (Operador ou Gestor).
+* **IA simulada** (`IaSimulada:Habilitada`): cada amarrado enviado recebe, após alguns segundos, um produto real do catálogo, uma quantidade próxima à do amarrado padrão e uma confiança aleatória; cerca de 10% falham, para testar o fluxo de falha. Resultados marcados com a versão `simulador-dev` e faixa "Ambiente de teste" na tela. **Nunca habilitar em produção.**
+
 ## Testes
 
 ```bash
-cd backend && dotnet test      # 61 testes
+cd backend && dotnet test      # 62 testes
 cd web && npx ng build
 ```
 
