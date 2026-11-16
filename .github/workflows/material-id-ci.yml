@@ -1,0 +1,29 @@
+name: Material ID — CI
+
+on:
+  push:
+    paths: ["material-id/**", ".github/workflows/material-id-ci.yml"]
+  pull_request:
+    paths: ["material-id/**", ".github/workflows/material-id-ci.yml"]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: material-id/backend } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with: { dotnet-version: "10.0.x" }
+      - run: dotnet restore
+      - run: dotnet build --no-restore -c Release
+      - run: dotnet test --no-build -c Release
+
+  web:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: material-id/web } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22", cache: npm, cache-dependency-path: material-id/web/package-lock.json }
+      - run: npm ci
+      - run: npx ng build

@@ -1,0 +1,124 @@
+<main class="container">
+  <a routerLink="/conferencias">← Conferências</a>
+
+  @if (erro()) { <p class="erro" role="alert">{{ erro() }}</p> }
+
+  @if (c(); as d) {
+    <header class="cartao topo">
+      <div class="row">
+        <h1>{{ d.resumo.codigo }} · {{ OPERACAO[d.resumo.operacao] }}</h1>
+        <span class="spacer"></span>
+        <app-etiqueta-status [status]="d.resumo.status" [rotulo]="STATUS_C[d.resumo.status]" />
+      </div>
+      <p class="muted">{{ d.resumo.contraparte ?? 'Sem fornecedor/cliente' }} · aberta por {{ d.resumo.criadaPor }} em {{ data(d.resumo.criadaEm) }}</p>
+      <dl class="numeros">
+        <div><dt>Peso medido</dt><dd>{{ kg(d.resumo.pesoMedidoKg) }}</dd></div>
+        <div><dt>Amarrados</dt><dd>{{ d.resumo.quantidadeAmarrados }}</dd></div>
+        <div><dt>Peças</dt><dd>{{ d.resumo.quantidadePecas }}</dd></div>
+      </dl>
+      <div class="row">
+        @for (g of acoesConferencia(); track g) {
+          <button type="button" class="btn" [class.primario]="g === 'Encerrar' || g === 'Validar'" [class.perigo]="g === 'Cancelar'"
+            [disabled]="ocupado()" (click)="executarConferencia(g)">{{ rotuloConferencia(g) }}</button>
+        }
+        @if (d.resumo.status === 'Aberta' && sessao.podeCapturar()) {
+          <button type="button" class="btn" [disabled]="ocupado()" (click)="adicionarAmarrado()">+ Amarrado</button>
+        }
+      </div>
+    </header>
+
+    @if (pendente(); as p) {
+      <form class="cartao destaque" (ngSubmit)="confirmarMotivo()" aria-labelledby="titulo-motivo">
+        <h2 id="titulo-motivo">{{ p.titulo }}</h2>
+        <div class="campo">
+          <label for="motivo">Motivo (obrigatório)</label>
+          <textarea id="motivo" name="motivo" rows="2" [(ngModel)]="motivo" required></textarea>
+        </div>
+        <div class="row">
+          <button class="btn primario" type="submit" [disabled]="ocupado()">Confirmar</button>
+          <button class="btn" type="button" (click)="pendente.set(null)">Voltar</button>
+        </div>
+      </form>
+    }
+
+    @if (corrigindo(); as a) {
+      <form class="cartao destaque" (ngSubmit)="salvarCorrecao()" aria-labelledby="titulo-correcao">
+        <h2 id="titulo-correcao">Corrigir amarrado {{ a.sequencia }}</h2>
+        <p class="muted">Informe o valor correto. Ele é obrigatório e, depois de validado pelo gestor, treina o modelo.</p>
+        <p>Identificado: <strong>{{ a.resultado?.descricao ?? '—' }}</strong> · {{ a.resultado?.quantidade ?? '—' }} peças</p>
+        <div class="campo">
+          <label for="busca-item">Buscar produto correto (ex.: 40x20 1,20)</label>
+          <div class="row">
+            <input id="busca-item" name="buscaItem" [(ngModel)]="buscaItem" (keydown.enter)="$event.preventDefault(); buscarItens()">
+            <button class="btn" type="button" (click)="buscarItens()">Buscar</button>
+          </div>
+        </div>
+        @if (opcoes().length) {
+          <div class="campo">
+            <label for="item-correto">Produto correto</label>
+            <select id="item-correto" name="itemCorreto" [(ngModel)]="itemCorreto">
+              @for (i of opcoes(); track i.id) { <option [value]="i.id">{{ i.descricao }} — {{ i.fabricante }}</option> }
+            </select>
+          </div>
+        }
+        <div class="grade-campos">
+          <div class="campo"><label for="qtd">Quantidade de peças</label>
+            <input id="qtd" name="qtd" type="number" min="1" inputmode="numeric" [(ngModel)]="quantidadeCorreta" required></div>
+          <div class="campo"><label for="comp">Comprimento (mm, opcional)</label>
+            <input id="comp" name="comp" type="number" min="1" inputmode="decimal" [(ngModel)]="comprimentoCorreto"></div>
+          <div class="campo"><label for="larg">Largura (mm, só chapa)</label>
+            <input id="larg" name="larg" type="number" min="1" inputmode="decimal" [(ngModel)]="larguraCorreta"></div>
+        </div>
+        <div class="row">
+          <button class="btn primario" type="submit" [disabled]="ocupado()">Salvar correção</button>
+          <button class="btn" type="button" (click)="corrigindo.set(null)">Voltar</button>
+        </div>
+      </form>
+    }
+
+    <h2>Amarrados</h2>
+    @if (d.analises.length === 0) { <p class="muted">Nenhum amarrado ainda.</p> }
+    <ul class="lista">
+      @for (a of d.analises; track a.id) {
+        <li class="cartao amarrado">
+          <div class="row">
+            <strong>Amarrado {{ a.sequencia }}</strong><span class="spacer"></span>
+            <app-etiqueta-status [status]="a.status" [rotulo]="STATUS_A[a.status]" />
+          </div>
+          @if (a.medicaoAtual; as m) {
+            <p class="produto">{{ m.descricao }}</p>
+            <p class="row"><strong>{{ kg(m.pesoKg) }}</strong><span class="muted">{{ m.quantidade }} peças</span>
+              <span class="muted">Confiança {{ confianca(a.confianca) }}</span></p>
+            @if (a.correcao && a.resultado) {
+              <p class="muted">Corrigido de: {{ a.resultado.descricao }} · {{ a.resultado.quantidade }} peças</p>
+            }
+          } @else if (a.status === 'Capturando') {
+            <p class="muted">Aguardando as fotos. A captura guiada pela câmera chega com o E3-02.</p>
+          } @else if (a.status === 'Processando') {
+            <p class="muted" aria-live="polite">Identificando produto e contando as peças…</p>
+          } @else if (a.motivoFalha) {
+            <p class="erro">{{ a.motivoFalha }}</p>
+          }
+          <div class="row">
+            @for (g of acoesAnalise(a); track g) {
+              <button type="button" class="btn" [class.primario]="g === 'Confirmar' || g === 'Validar'" [class.perigo]="g === 'Cancelar'"
+                [disabled]="ocupado()" (click)="executarAnalise(a, g)">{{ rotuloAnalise(g) }}</button>
+            }
+          </div>
+        </li>
+      }
+    </ul>
+
+    <h2>Linha do tempo</h2>
+    <ol class="tempo">
+      @for (t of linhaDoTempo(); track $index) {
+        <li><span class="muted">{{ data(t.em) }}</span> · <strong>{{ t.onde }}</strong>: {{ t.de }} → {{ t.para }}
+          <span class="muted">({{ t.gatilho }} por {{ t.usuario }})</span>
+          @if (t.motivo) { <div class="muted">Motivo: {{ t.motivo }}</div> }
+        </li>
+      }
+    </ol>
+  } @else if (!erro()) {
+    <p class="muted" aria-live="polite">Carregando…</p>
+  }
+</main>

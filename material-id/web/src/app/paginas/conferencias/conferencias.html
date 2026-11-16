@@ -1,0 +1,62 @@
+<main class="container">
+  <div class="row cabecalho">
+    <h1>Conferências</h1>
+    <span class="spacer"></span>
+    <button class="btn" type="button" (click)="carregar()">Atualizar</button>
+  </div>
+
+  @if (erro()) { <p class="erro" role="alert">{{ erro() }}</p> }
+
+  @if (sessao.podeCapturar()) {
+    <form class="cartao nova" (ngSubmit)="abrir()" aria-labelledby="titulo-nova">
+      <h2 id="titulo-nova">Nova conferência</h2>
+      <fieldset class="row operacao">
+        <legend class="sr-only">Operação</legend>
+        <label class="opcao"><input type="radio" name="operacao" value="Recebimento" [(ngModel)]="novaOperacao"> Recebimento</label>
+        <label class="opcao"><input type="radio" name="operacao" value="Expedicao" [(ngModel)]="novaOperacao"> Expedição</label>
+      </fieldset>
+      <div class="campo">
+        <label for="contraparte">{{ novaOperacao === 'Recebimento' ? 'Fornecedor' : 'Cliente' }} (opcional)</label>
+        <input id="contraparte" name="contraparte" [(ngModel)]="novaContraparte" autocomplete="organization">
+      </div>
+      <button class="btn primario" type="submit" [disabled]="abrindo()">Abrir conferência</button>
+    </form>
+  }
+
+  <div class="row filtros" role="toolbar" aria-label="Filtrar por status">
+    @for (f of filtros; track f) {
+      <button class="chip" type="button" [attr.aria-pressed]="filtro() === f" (click)="filtro.set(f)">
+        {{ rotuloFiltro(f) }} <span class="muted">({{ quantos(f) }})</span>
+      </button>
+    }
+  </div>
+  <div class="campo">
+    <label for="busca" class="sr-only">Buscar</label>
+    <input id="busca" type="search" placeholder="Buscar por código ou fornecedor/cliente" [ngModel]="busca()" (ngModelChange)="busca.set($event)">
+  </div>
+
+  @if (carregando()) {
+    <p class="muted" aria-live="polite">Carregando…</p>
+  } @else if (visiveis().length === 0) {
+    <p class="muted">Nenhuma conferência encontrada.</p>
+  } @else if (tela.desktop()) {
+    <ag-grid-angular class="grade" [theme]="tema" [localeText]="textos" [rowData]="visiveis()" [columnDefs]="colunas"
+      [pagination]="true" [paginationPageSize]="20" [paginationPageSizeSelector]="[20, 50, 100]"
+      (rowClicked)="aoClicarLinha($event)" [rowStyle]="{ cursor: 'pointer' }" />
+  } @else {
+    <ul class="lista" aria-label="Conferências">
+      @for (c of visiveis(); track c.id) {
+        <li>
+          <a class="cartao conferencia" [routerLink]="['/conferencias', c.id]">
+            <div class="row"><strong>{{ c.codigo }} · {{ OPERACAO[c.operacao] }}</strong><span class="spacer"></span>
+              <app-etiqueta-status [status]="c.status" [rotulo]="STATUS[c.status]" /></div>
+            <div class="muted">{{ c.contraparte ?? 'Sem fornecedor/cliente' }}</div>
+            <div class="row"><strong class="peso">{{ kg(c.pesoMedidoKg) }} medido</strong><span class="spacer"></span>
+              <span class="muted">{{ c.quantidadeAmarrados }} amarrado(s)</span></div>
+            <div class="row muted"><span>{{ c.quantidadePecas }} peças</span><span class="spacer"></span><span>{{ data(c.criadaEm) }}</span></div>
+          </a>
+        </li>
+      }
+    </ul>
+  }
+</main>

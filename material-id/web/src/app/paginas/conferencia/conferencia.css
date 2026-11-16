@@ -1,0 +1,14 @@
+.topo { margin: 12px 0; display: grid; gap: 8px; }
+.topo h1 { margin: 0; }
+.topo p { margin: 0; }
+.numeros { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 4px 0; }
+.numeros dt { color: var(--muted); font-size: .85rem; }
+.numeros dd { margin: 0; font-size: 1.15rem; font-weight: 700; }
+.destaque { border-color: var(--accent); margin-bottom: 12px; display: grid; }
+.destaque h2 { margin-top: 0; }
+.amarrado { display: grid; gap: 6px; }
+.amarrado p { margin: 0; }
+.produto { font-weight: 600; }
+.grade-campos { display: grid; grid-template-columns: 1fr; gap: 0 12px; }
+@media (min-width: 600px) { .grade-campos { grid-template-columns: repeat(3, 1fr); } }
+.tempo { padding-left: 20px; display: grid; gap: 8px; }

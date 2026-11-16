@@ -1,0 +1,33 @@
+# Material ID — ambiente local completo: PostgreSQL + API + front.
+# Uso: docker compose up --build   →  front em http://localhost:8084, API em http://localhost:8085/scalar
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: material_id
+      POSTGRES_USER: material_id
+      POSTGRES_PASSWORD: material_id_dev
+    ports: ["5437:5432"]
+    volumes: [material_id_pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U material_id -d material_id"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: ./backend
+    ports: ["8085:8080"]
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__MaterialId: Host=postgres;Port=5432;Database=material_id;Username=material_id;Password=material_id_dev
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  web:
+    build: ./web
+    ports: ["8084:80"]
+    depends_on: [api]
+
+volumes:
+  material_id_pgdata:
